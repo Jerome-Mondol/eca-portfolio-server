@@ -17,7 +17,7 @@ export async function list(req: AuthedRequest, res: Response) {
   } catch {}
   const data = await store.listActivities(userId);
   const body = { data };
-  try { await redisSet(key, JSON.stringify(body), 30); } catch {}
+  try { await redisSet(key, JSON.stringify(body), 60); } catch {}
   res.setHeader("X-Cache", "MISS");
   res.json(body);
 }

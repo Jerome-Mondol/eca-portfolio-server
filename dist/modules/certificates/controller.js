@@ -16,7 +16,7 @@ export async function list(req, res) {
     const data = await store.listCertificates(req.user.sub);
     const body = { data };
     try {
-        await redisSet(key, JSON.stringify(body), 30);
+        await redisSet(key, JSON.stringify(body), 60);
     }
     catch { }
     res.setHeader("X-Cache", "MISS");

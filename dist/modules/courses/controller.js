@@ -11,7 +11,7 @@ export async function list(req, res) { const key = cacheKey(req.user.sub); try {
     }
 }
 catch { } const data = await store.listCourses(req.user.sub); const body = { data }; try {
-    await redisSet(key, JSON.stringify(body), 30);
+    await redisSet(key, JSON.stringify(body), 60);
 }
 catch { } res.setHeader("X-Cache", "MISS"); res.json(body); }
 export async function getOne(req, res) { const item = await store.getCourse(req.params.id, req.user.sub); if (!item)

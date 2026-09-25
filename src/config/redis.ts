@@ -8,16 +8,25 @@ const memStore = new Map<string, { value: string; expiresAt?: number }>();
 export function getRedis(): Redis | null {
   if (!env.REDIS_URL || env.REDIS_URL.includes("YOUR_TOKEN") || env.REDIS_URL.includes("YOUR_HOST")) return null;
   if (!redis) {
-    // Upstash requires TLS for rediss://
     redis = new Redis(env.REDIS_URL, {
       tls: env.REDIS_URL.startsWith("rediss://") ? {} : undefined,
-      maxRetriesPerRequest: 2,
-      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      enableReadyCheck: true,
+      lazyConnect: false, // eager connect for instant cache HIT
+      connectTimeout: 3000,
+      retryStrategy: (times) => (times > 2 ? null : Math.min(times * 200, 1000)),
     });
     redis.on("error", (e: any) => console.error("[redis] error", e.message));
-    redis.connect().catch((e: any) => console.warn("[redis] connect failed, using memory fallback", e.message));
+    redis.on("ready", () => console.log("[redis] ready"));
+    // eager connect, but don't block
+    redis.connect().catch((e: any) => console.warn("[redis] connect failed, memory fallback", e.message));
   }
   return redis;
+}
+
+// eager warmup on import
+if (env.REDIS_URL && !env.REDIS_URL.includes("YOUR_TOKEN")) {
+  getRedis();
 }
 
 // Simple abstraction so service works with or without Upstash

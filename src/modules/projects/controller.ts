@@ -14,17 +14,17 @@ export async function list(req: AuthedRequest, res: Response) {
     const cached = await redisGet(key);
     if (cached) {
       res.setHeader("X-Cache", "HIT");
-      res.setHeader("Cache-Control", "public, max-age=30");
+      res.setHeader("Cache-Control", "public, max-age=60");
       return res.json(JSON.parse(cached));
     }
   } catch {}
   const data = await store.listProjects(userId);
   const body = { data };
   try {
-    await redisSet(key, JSON.stringify(body), 30);
+    await redisSet(key, JSON.stringify(body), 60);
   } catch {}
   res.setHeader("X-Cache", "MISS");
-  res.setHeader("Cache-Control", "public, max-age=30");
+  res.setHeader("Cache-Control", "public, max-age=60");
   res.json(body);
 }
 export async function getOne(req: AuthedRequest, res: Response) {

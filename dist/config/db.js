@@ -1,8 +1,8 @@
 import { Pool } from "pg";
 import { env } from "./env.js";
-// Neon Postgres — uses pooled connection string (DATABASE_URL)
-// Falls back to in-memory mode if not configured (useful for local dev without Neon)
+// Neon Postgres — pooled, eager warmup for near-instant queries (avoids cold start)
 let pool = null;
+let warmupDone = false;
 export function getPool() {
     if (!env.DATABASE_URL || env.DATABASE_URL.includes("ep-xxx") || env.DATABASE_URL.includes("user:password@"))
         return null;
@@ -12,10 +12,21 @@ export function getPool() {
             ssl: env.DATABASE_URL.includes("neon.tech") ? { rejectUnauthorized: false } : undefined,
             max: 10,
             idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 5000,
+            keepAlive: true,
         });
         pool.on("error", (err) => console.error("[db] pool error", err));
+        // eager warmup — fire once, don't block
+        if (!warmupDone) {
+            warmupDone = true;
+            pool.query("SELECT 1").then(() => console.log("[db] warmup ok")).catch(() => { });
+        }
     }
     return pool;
+}
+// Eager init on import — warms Neon even before first request
+if (env.DATABASE_URL && !env.DATABASE_URL.includes("ep-xxx")) {
+    getPool();
 }
 export async function initDb() {
     const p = getPool();
