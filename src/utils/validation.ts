@@ -63,6 +63,7 @@ export const certificateSchema = z.object({
   credentialUrl: z.string().url().optional().nullable().or(z.literal("")),
   skills: z.array(z.string()).optional().nullable(),
   documentKey: z.string().max(500).optional().nullable(),
+  documentName: z.string().max(255).optional().nullable(),
   visibility: z.enum(["public", "private"]).optional(),
 });
 
