@@ -79,10 +79,17 @@ export async function initDb() {
       role TEXT,
       featured BOOLEAN DEFAULT false,
       visibility TEXT DEFAULT 'public' CHECK (visibility IN ('public','private')),
+      links JSONB DEFAULT '[]'::jsonb,
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
+    -- ensure links column exists for existing DBs
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='projects' AND column_name='links') THEN
+        ALTER TABLE projects ADD COLUMN links JSONB DEFAULT '[]'::jsonb;
+      END IF;
+    END $$;
 
     CREATE TABLE IF NOT EXISTS activities (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -96,11 +103,17 @@ export async function initDb() {
       end_date DATE,
       achievements TEXT,
       skills TEXT[] DEFAULT '{}',
+      images TEXT[] DEFAULT '{}',
       visibility TEXT DEFAULT 'public' CHECK (visibility IN ('public','private')),
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_activities_user ON activities(user_id);
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='activities' AND column_name='images') THEN
+        ALTER TABLE activities ADD COLUMN images TEXT[] DEFAULT '{}';
+      END IF;
+    END $$;
 
     CREATE TABLE IF NOT EXISTS certificates (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

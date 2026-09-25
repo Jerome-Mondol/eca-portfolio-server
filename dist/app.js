@@ -14,6 +14,10 @@ import experiencesRouter from "./modules/experiences/router.js";
 import achievementsRouter from "./modules/achievements/router.js";
 import skillsRouter from "./modules/skills/router.js";
 import documentsRouter from "./modules/documents/router.js";
+import uploadRouter from "./modules/upload/router.js";
+import dashboardRouter from "./modules/dashboard/router.js";
+import portfolioRouter from "./modules/portfolio/router.js";
+import { isR2Configured } from "./config/r2.js";
 const app = express();
 app.use(helmet());
 app.use(cors({
@@ -25,10 +29,18 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
-// Health
-app.get("/api/health", (_req, res) => res.json({ ok: true, service: "folio-api", env: env.NODE_ENV, db: !!env.DATABASE_URL, redis: !!env.REDIS_URL }));
+// Health — includes R2 status for Cloudflare
+app.get("/api/health", (_req, res) => {
+    res.json({ ok: true, service: "folio-api", env: env.NODE_ENV, db: !!env.DATABASE_URL, redis: !!env.REDIS_URL, r2: isR2Configured() });
+});
 // Auth — Neon + Upstash backed, proper access/refresh with rotation
 app.use("/api/auth", authRouter);
+// Dashboard summary — single query, 30s Redis cache, near-instant
+app.use("/api/dashboard", dashboardRouter);
+// Public portfolio — real data, 60s cache, no auth (spec §24)
+app.use("/api/portfolio", portfolioRouter);
+// Universal image upload — used anywhere (profile, projects, certificates)
+app.use("/api/upload", uploadRouter);
 // MVP 1+2 — Profile + Content (Projects, ECA, Certificates, Courses) + Remaining (Experiences, Achievements, Skills, Documents) — all proper, no Cloudflare R2 yet
 app.use("/api/profile", profileRouter);
 app.use("/api/projects", projectsRouter);
@@ -41,8 +53,8 @@ app.use("/api/skills", skillsRouter);
 app.use("/api/documents", documentsRouter);
 // Also expose ECA alias for frontend convenience (/api/eca)
 app.use("/api/eca", activitiesRouter);
-// Resource placeholders (spec §52) — remaining (portfolio, ai, analytics — next)
-const resources = ["users", "portfolio", "ai", "analytics"];
+// Resource placeholders (spec §52) — remaining (ai, analytics — next)
+const resources = ["users", "ai", "analytics"];
 resources.forEach((r) => {
     app.use(`/api/${r}`, (_req, res) => res.status(501).json({ message: `${r} module not implemented yet` }));
 });

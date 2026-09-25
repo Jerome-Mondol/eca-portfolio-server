@@ -14,8 +14,8 @@ export function getRedis(): Redis | null {
       maxRetriesPerRequest: 2,
       lazyConnect: true,
     });
-    redis.on("error", (e) => console.error("[redis] error", e.message));
-    redis.connect().catch((e) => console.warn("[redis] connect failed, using memory fallback", e.message));
+    redis.on("error", (e: any) => console.error("[redis] error", e.message));
+    redis.connect().catch((e: any) => console.warn("[redis] connect failed, using memory fallback", e.message));
   }
   return redis;
 }

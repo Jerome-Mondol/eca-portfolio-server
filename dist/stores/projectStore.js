@@ -2,6 +2,24 @@ import { getPool } from "../config/db.js";
 const memProjects = new Map();
 function useDb() { return !!getPool(); }
 function rowToProject(row) {
+    // Normalize links: if stored as JSONB array, keep it; if legacy github/live exists, merge
+    let links = null;
+    if (row.links) {
+        try {
+            links = typeof row.links === "string" ? JSON.parse(row.links) : row.links;
+        }
+        catch {
+            links = null;
+        }
+    }
+    // Fallback: if links empty but legacy github/live exist, create from them
+    if ((!links || links.length === 0) && (row.github_url || row.live_url)) {
+        links = [];
+        if (row.github_url)
+            links.push({ platform: "GitHub", url: row.github_url });
+        if (row.live_url)
+            links.push({ platform: "Live", url: row.live_url });
+    }
     return {
         id: row.id,
         userId: row.user_id,
@@ -19,6 +37,7 @@ function rowToProject(row) {
         role: row.role,
         featured: row.featured,
         visibility: row.visibility,
+        links,
         createdAt: row.created_at?.toISOString?.(),
         updatedAt: row.updated_at?.toISOString?.(),
     };
@@ -43,19 +62,21 @@ export async function getProject(id, userId) {
     return p;
 }
 export async function createProject(userId, data) {
+    const links = data.links ? JSON.stringify(data.links) : null;
     if (useDb()) {
-        const r = await getPool().query(`INSERT INTO projects (user_id, title, description, detailed_description, cover_image, technologies, skills, start_date, end_date, github_url, live_url, demo_video, role, featured, visibility)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`, [userId, data.title, data.description ?? null, data.detailedDescription ?? null, data.coverImage ?? null, data.technologies ?? null, data.skills ?? null, data.startDate || null, data.endDate || null, data.githubUrl || null, data.liveUrl || null, data.demoVideo || null, data.role || null, !!data.featured, data.visibility || "public"]);
+        const r = await getPool().query(`INSERT INTO projects (user_id, title, description, detailed_description, cover_image, technologies, skills, start_date, end_date, github_url, live_url, demo_video, role, featured, visibility, links)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb) RETURNING *`, [userId, data.title, data.description ?? null, data.detailedDescription ?? null, data.coverImage ?? null, data.technologies ?? null, data.skills ?? null, data.startDate || null, data.endDate || null, data.githubUrl || null, data.liveUrl || null, data.demoVideo || null, data.role || null, !!data.featured, data.visibility || "public", links]);
         return rowToProject(r.rows[0]);
     }
     const id = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-    const proj = { id, userId, title: data.title, description: data.description ?? null, detailedDescription: data.detailedDescription ?? null, coverImage: data.coverImage ?? null, technologies: data.technologies ?? null, skills: data.skills ?? null, startDate: data.startDate ?? null, endDate: data.endDate ?? null, githubUrl: data.githubUrl ?? null, liveUrl: data.liveUrl ?? null, demoVideo: data.demoVideo ?? null, role: data.role ?? null, featured: !!data.featured, visibility: data.visibility || "public", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const proj = { id, userId, title: data.title, description: data.description ?? null, detailedDescription: data.detailedDescription ?? null, coverImage: data.coverImage ?? null, technologies: data.technologies ?? null, skills: data.skills ?? null, startDate: data.startDate ?? null, endDate: data.endDate ?? null, githubUrl: data.githubUrl ?? null, liveUrl: data.liveUrl ?? null, demoVideo: data.demoVideo ?? null, role: data.role ?? null, featured: !!data.featured, visibility: data.visibility || "public", links: data.links ?? null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     memProjects.set(id, proj);
     return proj;
 }
 export async function updateProject(id, userId, data) {
+    const links = data.links ? JSON.stringify(data.links) : null;
     if (useDb()) {
-        const r = await getPool().query(`UPDATE projects SET title=COALESCE($3, title), description=COALESCE($4, description), detailed_description=COALESCE($5, detailed_description), cover_image=COALESCE($6, cover_image), technologies=COALESCE($7, technologies), skills=COALESCE($8, skills), start_date=COALESCE($9, start_date), end_date=COALESCE($10, end_date), github_url=COALESCE($11, github_url), live_url=COALESCE($12, live_url), demo_video=COALESCE($13, demo_video), role=COALESCE($14, role), featured=COALESCE($15, featured), visibility=COALESCE($16, visibility), updated_at=NOW() WHERE id=$1 AND user_id=$2 RETURNING *`, [id, userId, data.title ?? null, data.description ?? null, data.detailedDescription ?? null, data.coverImage ?? null, data.technologies ?? null, data.skills ?? null, data.startDate ?? null, data.endDate ?? null, data.githubUrl ?? null, data.liveUrl ?? null, data.demoVideo ?? null, data.role ?? null, data.featured ?? null, data.visibility ?? null]);
+        const r = await getPool().query(`UPDATE projects SET title=COALESCE($3, title), description=COALESCE($4, description), detailed_description=COALESCE($5, detailed_description), cover_image=COALESCE($6, cover_image), technologies=COALESCE($7, technologies), skills=COALESCE($8, skills), start_date=COALESCE($9, start_date), end_date=COALESCE($10, end_date), github_url=COALESCE($11, github_url), live_url=COALESCE($12, live_url), demo_video=COALESCE($13, demo_video), role=COALESCE($14, role), featured=COALESCE($15, featured), visibility=COALESCE($16, visibility), links=COALESCE($17::jsonb, links), updated_at=NOW() WHERE id=$1 AND user_id=$2 RETURNING *`, [id, userId, data.title ?? null, data.description ?? null, data.detailedDescription ?? null, data.coverImage ?? null, data.technologies ?? null, data.skills ?? null, data.startDate ?? null, data.endDate ?? null, data.githubUrl ?? null, data.liveUrl ?? null, data.demoVideo ?? null, data.role ?? null, data.featured ?? null, data.visibility ?? null, links]);
         if (!r.rows[0])
             return null;
         return rowToProject(r.rows[0]);
@@ -63,7 +84,7 @@ export async function updateProject(id, userId, data) {
     const existing = memProjects.get(id);
     if (!existing || existing.userId !== userId)
         return null;
-    const updated = { ...existing, ...data, updatedAt: new Date().toISOString() };
+    const updated = { ...existing, ...data, links: data.links ?? existing.links, updatedAt: new Date().toISOString() };
     memProjects.set(id, updated);
     return updated;
 }

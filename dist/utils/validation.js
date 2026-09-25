@@ -23,7 +23,7 @@ export const projectSchema = z.object({
     title: z.string().min(2).max(120),
     description: z.string().max(500).optional().nullable(),
     detailedDescription: z.string().max(5000).optional().nullable(),
-    coverImage: z.string().max(500).optional().nullable(),
+    coverImage: z.string().max(1000).optional().nullable(),
     technologies: z.array(z.string()).optional().nullable(),
     skills: z.array(z.string()).optional().nullable(),
     startDate: z.string().optional().nullable(),
@@ -34,6 +34,7 @@ export const projectSchema = z.object({
     role: z.string().max(80).optional().nullable(),
     featured: z.boolean().optional(),
     visibility: z.enum(["public", "private"]).optional(),
+    links: z.array(z.object({ platform: z.string().min(1).max(40), url: z.string().min(3).max(500) })).optional().nullable(),
 });
 export const activitySchema = z.object({
     activityName: z.string().min(2).max(120),
@@ -45,6 +46,7 @@ export const activitySchema = z.object({
     endDate: z.string().optional().nullable(),
     achievements: z.string().max(1000).optional().nullable(),
     skills: z.array(z.string()).optional().nullable(),
+    images: z.array(z.string().max(1000)).max(5, "Max 5 images").optional().nullable(),
     visibility: z.enum(["public", "private"]).optional(),
 });
 export const certificateSchema = z.object({

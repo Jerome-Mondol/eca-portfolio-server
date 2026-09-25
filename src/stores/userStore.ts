@@ -73,3 +73,36 @@ export async function createUser(data: { email: string; username: string; passwo
   memByUsername.set(username, id);
   return user;
 }
+
+export async function updateUser(id: string, data: { fullName?: string; username?: string }): Promise<User | null> {
+  const existing = await findUserById(id);
+  if (!existing) return null;
+  if (data.username) {
+    const lower = data.username.toLowerCase();
+    // check duplicate
+    const dup = await findUserByUsername(lower);
+    if (dup && dup.id !== id) throw new Error("Username already taken");
+    data.username = lower;
+  }
+  if (useDb()) {
+    const r = await getPool()!.query(
+      `UPDATE users SET full_name = COALESCE($2, full_name), username = COALESCE($3, username), updated_at = NOW() WHERE id = $1 RETURNING id, email, username, password_hash, full_name, created_at`,
+      [id, data.fullName ?? null, data.username ?? null]
+    );
+    if (!r.rows[0]) return null;
+    const row = r.rows[0];
+    return { id: row.id, email: row.email, username: row.username, passwordHash: row.password_hash, fullName: row.full_name, createdAt: row.created_at?.toISOString?.() ?? new Date().toISOString() };
+  }
+  const updated: User = {
+    ...existing,
+    fullName: data.fullName ?? existing.fullName,
+    username: data.username ?? existing.username,
+  };
+  memUsers.set(id, updated);
+  if (data.username) {
+    // update indexes
+    for (const [k, v] of memByUsername.entries()) if (v === id) memByUsername.delete(k);
+    memByUsername.set(data.username, id);
+  }
+  return updated;
+}

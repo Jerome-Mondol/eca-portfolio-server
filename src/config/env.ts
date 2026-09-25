@@ -18,6 +18,13 @@ export const env = {
   ACCESS_TOKEN_EXPIRES: process.env.ACCESS_TOKEN_EXPIRES ?? "15m",
   REFRESH_TOKEN_EXPIRES: process.env.REFRESH_TOKEN_EXPIRES ?? "7d",
   REFRESH_COOKIE_NAME: process.env.REFRESH_COOKIE_NAME ?? "folio_refresh",
+  // Cloudflare R2 — for profile images and universal uploads
+  R2_ACCOUNT_ID: process.env.R2_ACCOUNT_ID ?? process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
+  R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID ?? process.env.CLOUDFLARE_R2_ACCESS_KEY_ID ?? "",
+  R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY ?? process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY ?? "",
+  R2_BUCKET: process.env.R2_BUCKET ?? process.env.CLOUDFLARE_R2_BUCKET ?? process.env.R2_BUCKET_NAME ?? "",
+  R2_PUBLIC_URL: process.env.R2_PUBLIC_URL ?? process.env.CLOUDFLARE_R2_PUBLIC_URL ?? "",
+  R2_ENDPOINT: process.env.R2_ENDPOINT ?? "", // optional override, default https://<ACCOUNT_ID>.r2.cloudflarestorage.com
 };
 
 export const isProd = env.NODE_ENV === "production";
