@@ -1,4 +1,4 @@
-import Redis from "ioredis";
+import { Redis } from "ioredis";
 import { env } from "./env.js";
 
 // Upstash Redis — uses REDIS_URL (rediss://...). Falls back to in-memory if not set.
