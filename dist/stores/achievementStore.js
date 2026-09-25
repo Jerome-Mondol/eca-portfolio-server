@@ -1,7 +1,7 @@
 import { getPool } from "../config/db.js";
 const mem = new Map();
 function useDb() { return !!getPool(); }
-function rowTo(row) { return { id: row.id, userId: row.user_id, title: row.title, category: row.category, organization: row.organization, date: row.date ? new Date(row.date).toISOString().slice(0, 10) : null, description: row.description, visibility: row.visibility, createdAt: row.created_at?.toISOString?.(), updatedAt: row.updated_at?.toISOString?.() }; }
+function rowTo(row) { return { id: row.id, userId: row.user_id, title: row.title, category: row.category, organization: row.organization, date: row.date ? new Date(row.date).toISOString().slice(0, 10) : null, description: row.description, images: row.images ?? [], visibility: row.visibility, createdAt: row.created_at?.toISOString?.(), updatedAt: row.updated_at?.toISOString?.() }; }
 export async function listAchievements(userId) { if (useDb()) {
     const r = await getPool().query("SELECT * FROM achievements WHERE user_id=$1 ORDER BY date DESC, created_at DESC", [userId]);
     return r.rows.map(rowTo);
@@ -14,16 +14,32 @@ export async function getAchievement(id, userId) { if (useDb()) {
 } const a = mem.get(id); if (!a || a.userId !== userId)
     return null; return a; }
 export async function createAchievement(userId, data) { if (useDb()) {
-    const r = await getPool().query(`INSERT INTO achievements (user_id, title, category, organization, date, description, visibility) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`, [userId, data.title, data.category ?? null, data.organization ?? null, data.date || null, data.description ?? null, data.visibility || "public"]);
+    const r = await getPool().query(`INSERT INTO achievements (user_id, title, category, organization, date, description, images, visibility) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`, [userId, data.title, data.category ?? null, data.organization ?? null, data.date || null, data.description ?? null, data.images ?? [], data.visibility || "public"]);
     return rowTo(r.rows[0]);
-} const id = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`; const a = { id, userId, title: data.title, category: data.category ?? null, organization: data.organization ?? null, date: data.date ?? null, description: data.description ?? null, visibility: data.visibility || "public", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; mem.set(id, a); return a; }
-export async function updateAchievement(id, userId, data) { if (useDb()) {
-    const r = await getPool().query(`UPDATE achievements SET title=COALESCE($3,title), category=COALESCE($4,category), organization=COALESCE($5,organization), date=COALESCE($6,date), description=COALESCE($7,description), visibility=COALESCE($8,visibility), updated_at=NOW() WHERE id=$1 AND user_id=$2 RETURNING *`, [id, userId, data.title ?? null, data.category ?? null, data.organization ?? null, data.date ?? null, data.description ?? null, data.visibility ?? null]);
-    if (!r.rows[0])
+} const id = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`; const a = { id, userId, title: data.title, category: data.category ?? null, organization: data.organization ?? null, date: data.date ?? null, description: data.description ?? null, images: data.images ?? [], visibility: data.visibility || "public", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; mem.set(id, a); return a; }
+export async function updateAchievement(id, userId, data) {
+    const images = data.images ? data.images.slice(0, 5) : null;
+    if (useDb()) {
+        if (images !== null) {
+            const r = await getPool().query(`UPDATE achievements SET title=COALESCE($3,title), category=COALESCE($4,category), organization=COALESCE($5,organization), date=COALESCE($6,date), description=COALESCE($7,description), images=$8, visibility=COALESCE($9,visibility), updated_at=NOW() WHERE id=$1 AND user_id=$2 RETURNING *`, [id, userId, data.title ?? null, data.category ?? null, data.organization ?? null, data.date ?? null, data.description ?? null, images, data.visibility ?? null]);
+            if (!r.rows[0])
+                return null;
+            return rowTo(r.rows[0]);
+        }
+        else {
+            const r = await getPool().query(`UPDATE achievements SET title=COALESCE($3,title), category=COALESCE($4,category), organization=COALESCE($5,organization), date=COALESCE($6,date), description=COALESCE($7,description), visibility=COALESCE($8,visibility), updated_at=NOW() WHERE id=$1 AND user_id=$2 RETURNING *`, [id, userId, data.title ?? null, data.category ?? null, data.organization ?? null, data.date ?? null, data.description ?? null, data.visibility ?? null]);
+            if (!r.rows[0])
+                return null;
+            return rowTo(r.rows[0]);
+        }
+    }
+    const ex = mem.get(id);
+    if (!ex || ex.userId !== userId)
         return null;
-    return rowTo(r.rows[0]);
-} const ex = mem.get(id); if (!ex || ex.userId !== userId)
-    return null; const upd = { ...ex, ...data, updatedAt: new Date().toISOString() }; mem.set(id, upd); return upd; }
+    const upd = { ...ex, ...data, images: images ?? ex.images, updatedAt: new Date().toISOString() };
+    mem.set(id, upd);
+    return upd;
+}
 export async function deleteAchievement(id, userId) { if (useDb()) {
     const r = await getPool().query("DELETE FROM achievements WHERE id=$1 AND user_id=$2", [id, userId]);
     return (r.rowCount ?? 0) > 0;

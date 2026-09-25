@@ -7,19 +7,44 @@ export function getPool() {
     if (!env.DATABASE_URL || env.DATABASE_URL.includes("ep-xxx") || env.DATABASE_URL.includes("user:password@"))
         return null;
     if (!pool) {
-        pool = new Pool({
-            connectionString: env.DATABASE_URL,
-            ssl: env.DATABASE_URL.includes("neon.tech") ? { rejectUnauthorized: false } : undefined,
+        // Strip query params unsupported by node-postgres (like channel_binding)
+        let connStr = env.DATABASE_URL.replace(/([?&])channel_binding=[^&]*&?/g, "$1").replace(/[?&]$/, "");
+        const newPool = new Pool({
+            connectionString: connStr,
+            ssl: connStr.includes("neon.tech") || connStr.includes("sslmode=require") ? { rejectUnauthorized: false } : undefined,
             max: 10,
-            idleTimeoutMillis: 30000,
-            connectionTimeoutMillis: 5000,
+            idleTimeoutMillis: 15000,
+            connectionTimeoutMillis: 10000,
             keepAlive: true,
+            keepAliveInitialDelayMillis: 5000,
         });
-        pool.on("error", (err) => console.error("[db] pool error", err));
+        newPool.on("error", (err) => {
+            console.warn("[db] pool idle error (will reconnect on next query):", err.message);
+        });
+        // Wrap query to automatically retry once on connection termination or socket timeout
+        const originalQuery = newPool.query.bind(newPool);
+        newPool.query = async function (text, params, callback) {
+            try {
+                return await originalQuery(text, params, callback);
+            }
+            catch (err) {
+                const isConnErr = err?.message?.includes("Connection terminated") ||
+                    err?.message?.includes("timeout") ||
+                    err?.code === "ECONNRESET" ||
+                    err?.code === "57P01" ||
+                    err?.code === "57P02";
+                if (isConnErr) {
+                    console.warn("[db] Connection dropped/timed out, retrying query once...", err.message);
+                    return await originalQuery(text, params, callback);
+                }
+                throw err;
+            }
+        };
+        pool = newPool;
         // eager warmup — fire once, don't block
         if (!warmupDone) {
             warmupDone = true;
-            pool.query("SELECT 1").then(() => console.log("[db] warmup ok")).catch(() => { });
+            pool.query("SELECT 1").then(() => console.log("[db] warmup ok")).catch((e) => console.warn("[db] warmup failed:", e.message));
         }
     }
     return pool;
@@ -184,11 +209,17 @@ export async function initDb() {
       organization TEXT,
       date DATE,
       description TEXT,
+      images TEXT[] DEFAULT '{}',
       visibility TEXT DEFAULT 'public' CHECK (visibility IN ('public','private')),
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_achievements_user ON achievements(user_id);
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='achievements' AND column_name='images') THEN
+        ALTER TABLE achievements ADD COLUMN images TEXT[] DEFAULT '{}';
+      END IF;
+    END $$;
 
     CREATE TABLE IF NOT EXISTS skills (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

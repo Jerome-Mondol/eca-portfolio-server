@@ -98,6 +98,7 @@ export const achievementSchema = z.object({
   organization: z.string().max(120).optional().nullable(),
   date: z.string().optional().nullable(),
   description: z.string().max(1000).optional().nullable(),
+  images: z.array(z.string().max(1000)).max(5, "Max 5 images").optional().nullable(),
   visibility: z.enum(["public", "private"]).optional(),
 });
 
