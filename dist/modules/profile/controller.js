@@ -4,22 +4,71 @@ import { findUserById, updateUser } from "../../stores/userStore.js";
 import { z } from "zod";
 import { redisGet, redisSet, redisDel } from "../../config/redis.js";
 import { clearDashboardCache } from "../dashboard/controller.js";
+/** Process-local tier so the profile page does not wait on Redis on every visit. */
+const mem = new Map();
+const PROFILE_FRESH_MS = 60_000;
+const PROFILE_STALE_MS = 300_000;
+const profileKey = (userId) => `profile:${userId}`;
+function clearProfileCache(userId) {
+    const key = profileKey(userId);
+    mem.delete(key);
+    mem.delete(`${key}:stale`);
+    void redisDel(key).catch(() => { });
+    void redisDel(`${key}:stale`).catch(() => { });
+}
+async function loadProfile(userId) {
+    const user = await findUserById(userId);
+    const profile = await store.getProfile(userId);
+    return {
+        user: user ? { id: user.id, email: user.email, username: user.username, fullName: user.fullName } : null,
+        profile: profile ?? {},
+    };
+}
 export async function getProfile(req, res) {
     const userId = req.user.sub;
-    const key = `profile:${userId}`;
+    const key = profileKey(userId);
+    // Per-user payload requested with an Authorization header: `public` would let
+    // a shared cache store it and serve it to the next visitor.
+    res.setHeader("Cache-Control", "private, no-store");
+    const fresh = mem.get(key);
+    if (fresh && Date.now() < fresh.expires) {
+        res.setHeader("X-Cache", "HIT-MEM");
+        return res.json(fresh.data);
+    }
+    const staleMem = mem.get(`${key}:stale`);
+    if (staleMem && Date.now() < staleMem.expires) {
+        res.setHeader("X-Cache", "STALE-MEM");
+        setImmediate(async () => {
+            try {
+                const body = await loadProfile(userId);
+                const now = Date.now();
+                mem.set(key, { data: body, expires: now + PROFILE_FRESH_MS });
+                mem.set(`${key}:stale`, { data: body, expires: now + PROFILE_STALE_MS });
+                await redisSet(key, JSON.stringify(body), PROFILE_FRESH_MS / 1000);
+                await redisSet(`${key}:stale`, JSON.stringify(body), PROFILE_STALE_MS / 1000);
+            }
+            catch { }
+        });
+        return res.json(staleMem.data);
+    }
     try {
         const cached = await redisGet(key);
         if (cached) {
+            const parsed = JSON.parse(cached);
+            const now = Date.now();
+            mem.set(key, { data: parsed, expires: now + PROFILE_FRESH_MS });
+            mem.set(`${key}:stale`, { data: parsed, expires: now + PROFILE_STALE_MS });
             res.setHeader("X-Cache", "HIT");
-            return res.json(JSON.parse(cached));
+            return res.json(parsed);
         }
     }
     catch { }
-    const user = await findUserById(userId);
-    const profile = await store.getProfile(userId);
-    const body = { user: user ? { id: user.id, email: user.email, username: user.username, fullName: user.fullName } : null, profile: profile ?? {} };
+    const body = await loadProfile(userId);
+    const now = Date.now();
+    mem.set(key, { data: body, expires: now + PROFILE_FRESH_MS });
+    mem.set(`${key}:stale`, { data: body, expires: now + PROFILE_STALE_MS });
     try {
-        await redisSet(key, JSON.stringify(body), 30);
+        await redisSet(key, JSON.stringify(body), PROFILE_FRESH_MS / 1000);
     }
     catch { }
     res.setHeader("X-Cache", "MISS");
@@ -60,7 +109,7 @@ export async function upsertProfile(req, res) {
     });
     const user = updatedUser ?? (await findUserById(userId));
     try {
-        await redisDel(`profile:${userId}`);
+        clearProfileCache(userId);
         await clearDashboardCache(userId);
     }
     catch { }

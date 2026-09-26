@@ -33,7 +33,7 @@ export async function getPublicPortfolio(req, res) {
         try {
             const [profRes, projRes, actRes, certRes, courseRes, expRes, achRes, skillRes] = await Promise.all([
                 pool.query("SELECT * FROM profiles WHERE user_id=$1", [userId]),
-                pool.query("SELECT * FROM projects WHERE user_id=$1 AND visibility='public' ORDER BY created_at DESC", [userId]),
+                pool.query("SELECT * FROM projects WHERE user_id=$1 AND visibility='public' ORDER BY created_at DESC LIMIT 5", [userId]),
                 pool.query("SELECT * FROM activities WHERE user_id=$1 AND visibility='public' ORDER BY created_at DESC", [userId]),
                 pool.query("SELECT * FROM certificates WHERE user_id=$1 AND visibility='public' ORDER BY created_at DESC", [userId]),
                 pool.query("SELECT * FROM courses WHERE user_id=$1 AND visibility='public' ORDER BY created_at DESC", [userId]),
@@ -90,6 +90,7 @@ export async function getPublicPortfolio(req, res) {
                 credentialUrl: r.credential_url,
                 skills: r.skills,
                 documentKey: r.document_key,
+                documentName: r.document_name,
             }));
             courses = courseRes.rows.map((r) => ({
                 id: r.id,
@@ -151,7 +152,7 @@ export async function getPublicPortfolio(req, res) {
                 listSkills(userId).catch(() => []),
             ]);
             profile = prof ? { headline: prof.headline, bio: prof.bio, location: prof.location, education: prof.education, interests: prof.interests, socials: prof.socials, avatarKey: prof.avatarKey } : null;
-            projects = projs.filter((p) => p.visibility !== "private");
+            projects = projs.filter((p) => p.visibility !== "private").slice(0, 5);
             activities = acts.filter((a) => a.visibility !== "private");
             certificates = certs.filter((c) => c.visibility !== "private");
             courses = crs.filter((c) => c.visibility !== "private");

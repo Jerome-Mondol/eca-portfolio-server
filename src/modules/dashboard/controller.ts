@@ -79,7 +79,7 @@ export async function getSummary(req: AuthedRequest, res: Response) {
   const mem = memCache.get(cacheKey);
   if (mem && Date.now() < mem.expires) {
     res.setHeader("X-Cache", "HIT-MEM");
-    res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+    res.setHeader("Cache-Control", "private, no-store");
     return res.json(mem.data);
   }
   // Check stale in-mem
@@ -104,7 +104,7 @@ export async function getSummary(req: AuthedRequest, res: Response) {
       const parsed = JSON.parse(cached);
       memCache.set(cacheKey, { data: parsed, expires: Date.now() + 60_000 });
       res.setHeader("X-Cache", "HIT");
-      res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+      res.setHeader("Cache-Control", "private, no-store");
       return res.json(parsed);
     }
     const stale = await redisGet(`${cacheKey}:stale`);
@@ -112,7 +112,7 @@ export async function getSummary(req: AuthedRequest, res: Response) {
       const parsed = JSON.parse(stale);
       memCache.set(`${cacheKey}:stale`, { data: parsed, expires: Date.now() + 300_000 });
       res.setHeader("X-Cache", "STALE");
-      res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+      res.setHeader("Cache-Control", "private, no-store");
       setImmediate(async () => {
         try {
           const fresh = await fetchFreshData(userId);
@@ -137,6 +137,6 @@ export async function getSummary(req: AuthedRequest, res: Response) {
   } catch {}
 
   res.setHeader("X-Cache", "MISS");
-  res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+  res.setHeader("Cache-Control", "private, no-store");
   res.json(data);
 }

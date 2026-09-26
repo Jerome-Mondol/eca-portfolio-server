@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { authMiddleware } from "../../middleware/auth.js";
-import { list, getOne, create, update, remove } from "./controller.js";
+import { list, getOne, create, update, remove, verifyLink } from "./controller.js";
 const r = Router();
 r.use(authMiddleware);
 r.get("/", list);
+r.post("/verify-link", verifyLink);
 r.get("/:id", getOne);
 r.post("/", create);
 r.put("/:id", update);

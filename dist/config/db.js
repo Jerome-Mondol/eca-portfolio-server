@@ -159,10 +159,16 @@ export async function initDb() {
       credential_url TEXT,
       skills TEXT[] DEFAULT '{}',
       document_key TEXT,
+      document_name TEXT,
       visibility TEXT DEFAULT 'public' CHECK (visibility IN ('public','private')),
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='certificates' AND column_name='document_name') THEN
+        ALTER TABLE certificates ADD COLUMN document_name TEXT;
+      END IF;
+    END $$;
     CREATE INDEX IF NOT EXISTS idx_certificates_user ON certificates(user_id);
 
     CREATE TABLE IF NOT EXISTS courses (
