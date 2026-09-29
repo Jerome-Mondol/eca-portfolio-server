@@ -1,4 +1,5 @@
 import { analyzeCertificate } from "./service.js";
+import { improveProjectDescription } from "./project.js";
 import { getCertificate, saveCertificateAnalysis } from "../../stores/certificateStore.js";
 const MAX_SIZE = 10 * 1024 * 1024;
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
@@ -39,5 +40,35 @@ export async function analyzeCertificateHandler(req, res) {
         if (status === 500)
             console.error("[ai] analyze failed:", err);
         res.status(status).json({ message });
+    }
+}
+/**
+ * Spec §21 — rewrite a project description, never persist it.
+ *
+ * The response is a proposal. Saving is the student's explicit next action
+ * against /api/projects, which is what keeps "AI never writes to the database
+ * on its own" (spec §63) true.
+ */
+export async function improveProjectHandler(req, res) {
+    const description = typeof req.body?.description === "string" ? req.body.description : "";
+    const title = typeof req.body?.title === "string" ? req.body.title : null;
+    if (!description.trim()) {
+        return res.status(400).json({ message: "Write what you built first, then improve it." });
+    }
+    try {
+        const suggestion = await improveProjectDescription({ description, title });
+        res.json({ data: suggestion });
+    }
+    catch (err) {
+        const message = err?.message ?? "Could not improve that description";
+        const userFacing = /busy right now|overloaded|unavailable/i.test(message);
+        const status = userFacing ? 503 : 422;
+        if (!userFacing)
+            console.error("[ai] improve failed:", err);
+        res.status(status).json({
+            message: userFacing
+                ? "The AI service is busy right now. Try again in a minute — nothing was changed."
+                : message,
+        });
     }
 }

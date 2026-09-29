@@ -1,4 +1,5 @@
 import { getLlm, getModel } from "../../config/llm.js";
+import { parseJsonLoose } from "./json.js";
 import { RESEARCH_RESPONSE_SCHEMA, researchResponseSchema, } from "./types.js";
 function buildPrompt(extracted) {
     const org = extracted.organization ?? "(not stated on the document)";
@@ -95,7 +96,7 @@ export async function researchCertificate(extracted) {
     const raw = typeof response?.text === "string" ? response.text : "";
     if (!raw.trim())
         return unavailable("Research returned no result.");
-    const parsed = researchResponseSchema.safeParse(extractJson(raw));
+    const parsed = researchResponseSchema.safeParse(parseJsonLoose(raw));
     if (!parsed.success) {
         console.error("[ai] research validation failed:", parsed.error.flatten());
         const partial = unavailable("Could not structure the research result.");
@@ -113,34 +114,4 @@ export async function researchCertificate(extracted) {
         sources,
         unavailable: false,
     };
-}
-/** Pull a JSON object out of a response that may be fenced, prefixed, or bare. */
-function extractJson(text) {
-    const trimmed = text.trim();
-    try {
-        return JSON.parse(trimmed);
-    }
-    catch {
-        /* fall through */
-    }
-    const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(trimmed);
-    if (fenced) {
-        try {
-            return JSON.parse(fenced[1]);
-        }
-        catch {
-            /* fall through */
-        }
-    }
-    const start = trimmed.indexOf("{");
-    const end = trimmed.lastIndexOf("}");
-    if (start !== -1 && end > start) {
-        try {
-            return JSON.parse(trimmed.slice(start, end + 1));
-        }
-        catch {
-            /* fall through */
-        }
-    }
-    return null;
 }

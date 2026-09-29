@@ -18,6 +18,7 @@ import uploadRouter from "./modules/upload/router.js";
 import dashboardRouter from "./modules/dashboard/router.js";
 import portfolioRouter from "./modules/portfolio/router.js";
 import aiRouter from "./modules/ai/router.js";
+import cronRouter from "./modules/cron/router.js";
 import { isR2Configured } from "./config/r2.js";
 
 const app = express();
@@ -34,6 +35,9 @@ app.use(
 app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+// Cron ping — external scheduler, answers with a bare "ok" and no dependency work
+app.use("/api/cron", cronRouter);
 
 // Health — includes R2 status for Cloudflare
 app.get("/api/health", (_req, res) => {

@@ -23,3 +23,62 @@ export function isLlmConfigured() {
 export function getModel() {
     return env.GEMINI_MODEL;
 }
+/**
+ * Tried in order when the primary model is overloaded or rate limited.
+ *
+ * The newest Flash models get capacity-throttled on free keys first, so the
+ * older-but-rested models in this list are the ones with headroom exactly when
+ * the primary is unavailable. Override the primary with GEMINI_MODEL; the tail
+ * stays as insurance.
+ */
+const FALLBACK_MODELS = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"];
+function modelChain() {
+    const primary = env.GEMINI_MODEL;
+    return [primary, ...FALLBACK_MODELS.filter((m) => m !== primary)];
+}
+/**
+ * True for the transient failures where a different model would probably work.
+ * Anything else (bad key, malformed request, safety block) is a real error and
+ * should surface immediately rather than burning the whole chain.
+ */
+function isRetryable(err) {
+    const status = err?.status ?? err?.code;
+    if (status === 429 || status === 500 || status === 502 || status === 503 || status === 504) {
+        return true;
+    }
+    const message = String(err?.message ?? err).toLowerCase();
+    return (/unavailable|overloaded|high demand|rate limit|resource[_ ]exhausted|503|429|timeout|etimedout|econnreset|fetch failed|network/.test(message));
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/**
+ * Run a generate call, walking the model chain on transient failures.
+ *
+ * Returns the response together with the model that actually served it, so the
+ * caller can record which model answered rather than claiming the primary did.
+ * The last error is rethrown once the chain is exhausted.
+ */
+export async function generateWithFallback(call, opts = {}) {
+    const perModel = opts.attemptsPerModel ?? 2;
+    const chain = modelChain();
+    let lastError;
+    for (let i = 0; i < chain.length; i++) {
+        const model = chain[i];
+        for (let attempt = 0; attempt < perModel; attempt++) {
+            try {
+                return { result: await call(model), model };
+            }
+            catch (err) {
+                lastError = err;
+                if (!isRetryable(err))
+                    throw err;
+                // Back off a little further on every attempt, but stay well under the
+                // 25s budget the whole request is allowed before a proxy gives up.
+                await sleep(250 * (attempt + 1) * (i + 1));
+            }
+        }
+        console.warn(`[llm] ${model} unavailable, trying next fallback`);
+    }
+    throw lastError instanceof Error
+        ? lastError
+        : new Error("The AI service is busy right now. Try again in a minute.");
+}

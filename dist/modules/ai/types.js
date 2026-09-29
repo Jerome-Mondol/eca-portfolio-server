@@ -1,9 +1,10 @@
 import { z } from "zod";
 /**
- * Shared types + schemas for the certificate analysis pipeline (spec §20, §54).
+ * Shared types + schemas for the AI pipeline (spec §20, §21, §54).
  *
- * The service layer is deliberately provider-agnostic: only extract.ts and
- * research.ts know which LLM is in use, so swapping providers is a one-file change.
+ * The service layer is deliberately provider-agnostic: only extract.ts,
+ * research.ts and project.ts know which LLM is in use, so swapping providers
+ * touches three files rather than one.
  */
 export const CONFIDENCE_FLOOR = 0.5;
 /** Weights for the evidence score. Tunable in one place — no logic depends on the numbers. */
@@ -163,3 +164,66 @@ export const researchResponseSchema = z.object({
         url: z.string().nullable(),
     })),
 });
+export const projectSuggestionSchema = z.object({
+    description: z.string(),
+    title: z.string().nullable(),
+    technologies: z.array(z.string()),
+    highlights: z.array(z.string()),
+    missing: z.array(z.object({
+        field: z.enum(["outcome", "metric", "role", "users", "tech", "scope", "link"]),
+        question: z.string(),
+        why: z.string(),
+    })),
+    confidence: z.number().min(0).max(1),
+});
+/** JSON Schema handed to the model for step 1 of the project assistant. */
+export const PROJECT_RESPONSE_SCHEMA = {
+    type: "object",
+    properties: {
+        description: {
+            type: "string",
+            description: "The rewritten portfolio description, 1-3 sentences, third person or first person plural as the input uses. Concrete and outcome-shaped, but ONLY using facts present in the input.",
+        },
+        title: {
+            type: ["string", "null"],
+            description: "A short specific project title, or null when the student did not provide or ask for one. Never generic words like 'Website' or 'Project'.",
+        },
+        technologies: {
+            type: "array",
+            items: { type: "string" },
+            description: "Only tools, languages, or platforms the student explicitly named. Never add a technology they did not mention, and never guess from the project type. Empty array when none were named.",
+        },
+        highlights: {
+            type: "array",
+            items: { type: "string" },
+            description: "Up to 4 short accomplishment statements, each derived from something the student actually said. No invented numbers, no claims of outcomes they did not describe.",
+        },
+        missing: {
+            type: "array",
+            description: "Details a reviewer expects that the student did not provide. This is where you record what you refused to invent. Order by impact on how convincing the project looks.",
+            items: {
+                type: "object",
+                properties: {
+                    field: {
+                        type: "string",
+                        enum: ["outcome", "metric", "role", "users", "tech", "scope", "link"],
+                    },
+                    question: {
+                        type: "string",
+                        description: "A short question the student can answer in one line, e.g. 'How many people used it?'",
+                    },
+                    why: {
+                        type: "string",
+                        description: "One sentence on why this matters to someone reviewing the project.",
+                    },
+                },
+                required: ["field", "question", "why"],
+            },
+        },
+        confidence: {
+            type: "number",
+            description: "0 to 1. How much concrete detail the input contained. Low when the description is vague, since a vague input cannot be honestly improved.",
+        },
+    },
+    required: ["description", "title", "technologies", "highlights", "missing", "confidence"],
+};
