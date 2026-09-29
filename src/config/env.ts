@@ -25,6 +25,13 @@ export const env = {
   R2_BUCKET: process.env.R2_BUCKET ?? process.env.CLOUDFLARE_R2_BUCKET ?? process.env.R2_BUCKET_NAME ?? "",
   R2_PUBLIC_URL: process.env.R2_PUBLIC_URL ?? process.env.CLOUDFLARE_R2_PUBLIC_URL ?? "",
   R2_ENDPOINT: process.env.R2_ENDPOINT ?? "", // optional override, default https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+  // AI — certificate extraction + research (spec §20, §54)
+  // Free tier: no card, ~1500 req/day, ~500/day when Google Search grounding is used.
+  // NOTE: on the free tier Google may use submitted images/text to improve its models.
+  // The paid tier does not. Only the issuing organization name is ever sent — never
+  // the student's name — but be aware of this before onboarding real users.
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY ?? "",
+  GEMINI_MODEL: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
 };
 
 export const isProd = env.NODE_ENV === "production";

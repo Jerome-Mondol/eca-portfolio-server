@@ -17,6 +17,7 @@ import documentsRouter from "./modules/documents/router.js";
 import uploadRouter from "./modules/upload/router.js";
 import dashboardRouter from "./modules/dashboard/router.js";
 import portfolioRouter from "./modules/portfolio/router.js";
+import aiRouter from "./modules/ai/router.js";
 import { isR2Configured } from "./config/r2.js";
 const app = express();
 app.use(helmet());
@@ -53,8 +54,13 @@ app.use("/api/skills", skillsRouter);
 app.use("/api/documents", documentsRouter);
 // Also expose ECA alias for frontend convenience (/api/eca)
 app.use("/api/eca", activitiesRouter);
-// Resource placeholders (spec §52) — remaining (ai, analytics — next)
-const resources = ["users", "ai", "analytics"];
+// AI — certificate extraction + research (spec §20, §54). Vision reads the file
+// directly, then a grounded web search checks the issuer, then a deterministic
+// score. Synchronous: 10-25s. If you deploy behind a proxy with a sub-60s
+// timeout, this is the first call to convert to a background job.
+app.use("/api/ai", aiRouter);
+// Resource placeholders (spec §52) — remaining (users, analytics)
+const resources = ["users", "analytics"];
 resources.forEach((r) => {
     app.use(`/api/${r}`, (_req, res) => res.status(501).json({ message: `${r} module not implemented yet` }));
 });

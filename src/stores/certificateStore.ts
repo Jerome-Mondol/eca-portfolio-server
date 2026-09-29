@@ -1,10 +1,25 @@
 import { getPool } from "../config/db.js";
-export type Certificate = { id:string; userId:string; name:string; organization?:string|null; issueDate?:string|null; credentialId?:string|null; credentialUrl?:string|null; skills?:string[]|null; documentKey?:string|null; documentName?:string|null; visibility?:string; createdAt?:string; updatedAt?:string };
+export type Certificate = { id:string; userId:string; name:string; organization?:string|null; issueDate?:string|null; credentialId?:string|null; credentialUrl?:string|null; skills?:string[]|null; documentKey?:string|null; documentName?:string|null; visibility?:string; aiAnalysis?:any|null; createdAt?:string; updatedAt?:string };
 const mem=new Map<string,Certificate>();
 function useDb(){return !!getPool();}
-function rowTo(row:any):Certificate{return {id:row.id,userId:row.user_id,name:row.name,organization:row.organization,issueDate:row.issue_date?new Date(row.issue_date).toISOString().slice(0,10):null,credentialId:row.credential_id,credentialUrl:row.credential_url,skills:row.skills,documentKey:row.document_key,documentName:row.document_name,visibility:row.visibility,createdAt:row.created_at?.toISOString?.(),updatedAt:row.updated_at?.toISOString?.()};}
+function rowTo(row:any):Certificate{return {id:row.id,userId:row.user_id,name:row.name,organization:row.organization,issueDate:row.issue_date?new Date(row.issue_date).toISOString().slice(0,10):null,credentialId:row.credential_id,credentialUrl:row.credential_url,skills:row.skills,documentKey:row.document_key,documentName:row.document_name,visibility:row.visibility,aiAnalysis:row.ai_analysis??null,createdAt:row.created_at?.toISOString?.(),updatedAt:row.updated_at?.toISOString?.()};}
 export async function listCertificates(userId:string):Promise<Certificate[]>{ if(useDb()){const r=await getPool()!.query("SELECT * FROM certificates WHERE user_id=$1 ORDER BY created_at DESC",[userId]);return r.rows.map(rowTo);} return Array.from(mem.values()).filter(c=>c.userId===userId).sort((a,b)=>(b.createdAt??"").localeCompare(a.createdAt??""));}
 export async function getCertificate(id:string,userId:string):Promise<Certificate|null>{ if(useDb()){const r=await getPool()!.query("SELECT * FROM certificates WHERE id=$1 AND user_id=$2",[id,userId]);if(!r.rows[0])return null;return rowTo(r.rows[0]);} const c=mem.get(id); if(!c||c.userId!==userId)return null;return c;}
 export async function createCertificate(userId:string,data:any):Promise<Certificate>{ if(useDb()){const r=await getPool()!.query(`INSERT INTO certificates (user_id, name, organization, issue_date, credential_id, credential_url, skills, document_key, document_name, visibility) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,[userId,data.name,data.organization??null,data.issueDate||null,data.credentialId??null,data.credentialUrl??null,data.skills??null,data.documentKey??null,data.documentName??null,data.visibility||"public"]);return rowTo(r.rows[0]);} const id=globalThis.crypto?.randomUUID?.()??`${Date.now()}-${Math.random()}`; const c:Certificate={id,userId,name:data.name,organization:data.organization??null,issueDate:data.issueDate??null,credentialId:data.credentialId??null,credentialUrl:data.credentialUrl??null,skills:data.skills??null,documentKey:data.documentKey??null,documentName:data.documentName??null,visibility:data.visibility||"public",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}; mem.set(id,c);return c;}
 export async function updateCertificate(id:string,userId:string,data:any):Promise<Certificate|null>{ if(useDb()){const r=await getPool()!.query(`UPDATE certificates SET name=COALESCE($3,name), organization=COALESCE($4,organization), issue_date=COALESCE($5,issue_date), credential_id=COALESCE($6,credential_id), credential_url=COALESCE($7,credential_url), skills=COALESCE($8,skills), document_key=COALESCE($9,document_key), document_name=COALESCE($10,document_name), visibility=COALESCE($11,visibility), updated_at=NOW() WHERE id=$1 AND user_id=$2 RETURNING *`,[id,userId,data.name??null,data.organization??null,data.issueDate??null,data.credentialId??null,data.credentialUrl??null,data.skills??null,data.documentKey??null,data.documentName??null,data.visibility??null]);if(!r.rows[0])return null;return rowTo(r.rows[0]);} const ex=mem.get(id);if(!ex||ex.userId!==userId)return null;const upd={...ex,...data,updatedAt:new Date().toISOString()};mem.set(id,upd);return upd;}
 export async function deleteCertificate(id:string,userId:string):Promise<boolean>{ if(useDb()){const r=await getPool()!.query("DELETE FROM certificates WHERE id=$1 AND user_id=$2",[id,userId]);return (r.rowCount??0)>0;} const ex=mem.get(id);if(!ex||ex.userId!==userId)return false;mem.delete(id);return true;}
+
+// Persist an AI analysis onto a certificate the student owns. Scoped by user_id
+// so an analysis can never be written to another student's row.
+export async function saveCertificateAnalysis(id:string,userId:string,analysis:any):Promise<boolean>{
+  if(useDb()){
+    const r=await getPool()!.query("UPDATE certificates SET ai_analysis=$3, updated_at=NOW() WHERE id=$1 AND user_id=$2 RETURNING id",[id,userId,JSON.stringify(analysis)]);
+    return (r.rowCount??0)>0;
+  }
+  const ex=mem.get(id);
+  if(!ex||ex.userId!==userId)return false;
+  ex.aiAnalysis=analysis;
+  ex.updatedAt=new Date().toISOString();
+  mem.set(id,ex);
+  return true;
+}

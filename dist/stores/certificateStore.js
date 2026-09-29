@@ -1,7 +1,7 @@
 import { getPool } from "../config/db.js";
 const mem = new Map();
 function useDb() { return !!getPool(); }
-function rowTo(row) { return { id: row.id, userId: row.user_id, name: row.name, organization: row.organization, issueDate: row.issue_date ? new Date(row.issue_date).toISOString().slice(0, 10) : null, credentialId: row.credential_id, credentialUrl: row.credential_url, skills: row.skills, documentKey: row.document_key, documentName: row.document_name, visibility: row.visibility, createdAt: row.created_at?.toISOString?.(), updatedAt: row.updated_at?.toISOString?.() }; }
+function rowTo(row) { return { id: row.id, userId: row.user_id, name: row.name, organization: row.organization, issueDate: row.issue_date ? new Date(row.issue_date).toISOString().slice(0, 10) : null, credentialId: row.credential_id, credentialUrl: row.credential_url, skills: row.skills, documentKey: row.document_key, documentName: row.document_name, visibility: row.visibility, aiAnalysis: row.ai_analysis ?? null, createdAt: row.created_at?.toISOString?.(), updatedAt: row.updated_at?.toISOString?.() }; }
 export async function listCertificates(userId) { if (useDb()) {
     const r = await getPool().query("SELECT * FROM certificates WHERE user_id=$1 ORDER BY created_at DESC", [userId]);
     return r.rows.map(rowTo);
@@ -29,3 +29,18 @@ export async function deleteCertificate(id, userId) { if (useDb()) {
     return (r.rowCount ?? 0) > 0;
 } const ex = mem.get(id); if (!ex || ex.userId !== userId)
     return false; mem.delete(id); return true; }
+// Persist an AI analysis onto a certificate the student owns. Scoped by user_id
+// so an analysis can never be written to another student's row.
+export async function saveCertificateAnalysis(id, userId, analysis) {
+    if (useDb()) {
+        const r = await getPool().query("UPDATE certificates SET ai_analysis=$3, updated_at=NOW() WHERE id=$1 AND user_id=$2 RETURNING id", [id, userId, JSON.stringify(analysis)]);
+        return (r.rowCount ?? 0) > 0;
+    }
+    const ex = mem.get(id);
+    if (!ex || ex.userId !== userId)
+        return false;
+    ex.aiAnalysis = analysis;
+    ex.updatedAt = new Date().toISOString();
+    mem.set(id, ex);
+    return true;
+}

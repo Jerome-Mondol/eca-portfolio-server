@@ -177,6 +177,11 @@ export async function initDb() {
         ALTER TABLE certificates ADD COLUMN document_name TEXT;
       END IF;
     END $$;
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='certificates' AND column_name='ai_analysis') THEN
+        ALTER TABLE certificates ADD COLUMN ai_analysis JSONB;
+      END IF;
+    END $$;
     CREATE INDEX IF NOT EXISTS idx_certificates_user ON certificates(user_id);
 
     CREATE TABLE IF NOT EXISTS courses (
