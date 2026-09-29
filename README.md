@@ -1,4 +1,4 @@
-# Folio Server — Express API (Neon + Upstash)
+# Proofolio Server — Express API (Neon + Upstash)
 
 Intended architecture per spec §62:
 ```
@@ -47,9 +47,9 @@ PORT=4000
 
 ### Auth Endpoints (spec §7)
 ```
-POST /api/auth/register {fullName,email,username,password,confirmPassword} → {user, accessToken, refreshToken} + Set-Cookie folio_refresh
+POST /api/auth/register {fullName,email,username,password,confirmPassword} → {user, accessToken, refreshToken} + Set-Cookie proofolio_refresh
 POST /api/auth/login {email,password} → {user, accessToken, refreshToken}
-POST /api/auth/refresh (cookie folio_refresh or body.refreshToken) → {accessToken, refreshToken} // rotates, old revoked
+POST /api/auth/refresh (cookie proofolio_refresh or body.refreshToken) → {accessToken, refreshToken} // rotates, old revoked
 POST /api/auth/logout (cookie or body) → clears cookie, revokes
 GET  /api/auth/me  Authorization: Bearer <access> → {user}
 ```

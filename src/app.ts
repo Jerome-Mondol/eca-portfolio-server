@@ -41,7 +41,7 @@ app.use("/api/cron", cronRouter);
 
 // Health — includes R2 status for Cloudflare
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, service: "folio-api", env: env.NODE_ENV, db: !!env.DATABASE_URL, redis: !!env.REDIS_URL, r2: isR2Configured() });
+  res.json({ ok: true, service: "proofolio-api", env: env.NODE_ENV, db: !!env.DATABASE_URL, redis: !!env.REDIS_URL, r2: isR2Configured() });
 });
 
 // Auth — Neon + Upstash backed, proper access/refresh with rotation
@@ -93,7 +93,7 @@ initDb().catch((e) => console.error("[db] init failed, running in memory fallbac
 
 const port = env.PORT;
 if (process.env.NODE_ENV !== "test") {
-  app.listen(port, () => console.log(`Folio API listening on http://localhost:${port} — Neon:${!!env.DATABASE_URL} Upstash:${!!env.REDIS_URL}`));
+  app.listen(port, () => console.log(`Proofolio API listening on http://localhost:${port} — Neon:${!!env.DATABASE_URL} Upstash:${!!env.REDIS_URL}`));
 }
 
 export default app;

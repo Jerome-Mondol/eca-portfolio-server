@@ -18,13 +18,13 @@ export function signAccessToken(payload: Omit<AccessPayload, "jti">): string {
   const jti = randomUUID();
   return jwt.sign({ ...payload, jti }, env.JWT_ACCESS_SECRET, {
     expiresIn: env.ACCESS_TOKEN_EXPIRES as any,
-    issuer: "folio",
-    audience: "folio-client",
+    issuer: "proofolio",
+    audience: "proofolio-client",
   });
 }
 
 export function verifyAccessToken(token: string): AccessPayload {
-  return jwt.verify(token, env.JWT_ACCESS_SECRET, { issuer: "folio", audience: "folio-client" }) as AccessPayload;
+  return jwt.verify(token, env.JWT_ACCESS_SECRET, { issuer: "proofolio", audience: "proofolio-client" }) as AccessPayload;
 }
 
 export function signRefreshToken(userId: string): { token: string; jti: string; expiresAt: Date } {
@@ -32,8 +32,8 @@ export function signRefreshToken(userId: string): { token: string; jti: string; 
   const expiresIn = env.REFRESH_TOKEN_EXPIRES;
   const token = jwt.sign({ sub: userId, jti }, env.JWT_REFRESH_SECRET, {
     expiresIn: expiresIn as any,
-    issuer: "folio",
-    audience: "folio-refresh",
+    issuer: "proofolio",
+    audience: "proofolio-refresh",
   });
   const decoded = jwt.decode(token) as any;
   const expiresAt = new Date(decoded.exp * 1000);
@@ -41,7 +41,7 @@ export function signRefreshToken(userId: string): { token: string; jti: string; 
 }
 
 export function verifyRefreshToken(token: string): RefreshPayload {
-  return jwt.verify(token, env.JWT_REFRESH_SECRET, { issuer: "folio", audience: "folio-refresh" }) as RefreshPayload;
+  return jwt.verify(token, env.JWT_REFRESH_SECRET, { issuer: "proofolio", audience: "proofolio-refresh" }) as RefreshPayload;
 }
 
 export function decodeExpiry(token: string): Date | null {

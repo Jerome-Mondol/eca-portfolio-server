@@ -17,7 +17,7 @@ export const env = {
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET ?? "dev-refresh-secret-change-in-prod-32chars!",
   ACCESS_TOKEN_EXPIRES: process.env.ACCESS_TOKEN_EXPIRES ?? "15m",
   REFRESH_TOKEN_EXPIRES: process.env.REFRESH_TOKEN_EXPIRES ?? "7d",
-  REFRESH_COOKIE_NAME: process.env.REFRESH_COOKIE_NAME ?? "folio_refresh",
+  REFRESH_COOKIE_NAME: process.env.REFRESH_COOKIE_NAME ?? "proofolio_refresh",
   // Cloudflare R2 — for profile images and universal uploads
   R2_ACCOUNT_ID: process.env.R2_ACCOUNT_ID ?? process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
   R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID ?? process.env.CLOUDFLARE_R2_ACCESS_KEY_ID ?? "",
