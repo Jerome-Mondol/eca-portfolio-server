@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node api.js && tsx watch src/app.ts",
+    "dev": "tsx watch src/app.ts",
     "build": "tsc",
-    "start": "node api.js && node dist/app.js"
+    "start": "node dist/app.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1140.0",
